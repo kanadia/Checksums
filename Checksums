@@ -1,0 +1,340 @@
+import java.util.Scanner;
+import java.io.File;
+import java.io.FileNotFoundException;
+
+/* -----------------------------------------------------------------------------------------------------
+ * To Execute: java Hw02 textfile.txt checksum_size
+ *             where the files in the command line are in the current directory
+ *             
+ *             The text file contains text is mixed case with space, punctuation,
+ *             and is terminated by the hexadecimal '0A', inclusive.
+ *             (The 0x'0A' is included in the checksum calculation.)
+ *             
+ *             The checksum_size contains digit(s) expressing the checksum size
+ *             of either 8, 16, or 32 bits
+ *             
+ * -----------------------------------------------------------------------------------------------------
+ */
+
+public class checksum {
+
+	public static void main(String[] args) throws FileNotFoundException 
+	{
+		//File file = new File(args[0]); 
+		File file = new File("C:\\Users\\vidhi\\OneDrive\\Documents\\CIS Project 2\\in10A.txt");
+		int length = (int) file.length();
+		
+		Scanner scanFile = new Scanner(file);
+		//Scanner scanBits = new Scanner(args[1]);
+		
+		//int bits = scanBits.nextInt();
+		int bits = 32;
+		
+		if(bits != 8 && bits != 16 && bits != 32)
+			System.err.println("Valid checksum sizes are 8, 16, or 32\n");
+			
+		char [] array = new char [length];
+		int i = 0, j = 0, temp;
+		String text;
+		
+		while(scanFile.hasNext()) // String "text" reads the file and stores each character in "array"
+		{
+			text = scanFile.nextLine();
+			j = 0;
+			temp = (i + text.length());
+			
+			for(; i < temp; i++)
+			{
+				array[i] = text.charAt(j);
+				j++;
+			}
+		}
+		
+		printFile(array, length, bits); //Calling the printFile function to echo the file to the console in proper format
+	}
+	
+//-----------------------------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------------------------------------------------
+	
+	public static void printFile(char [] array, int length, int bits)
+	{
+		int count = 0;
+		
+		System.out.println();
+		for(int i = 0; i < array.length - 1; i++) //Iterating through the char array
+		{
+			System.out.print(array[i]);
+			count++;
+			if(count == 80) System.out.println(); //Once 80 characters are printed in one line, it goes to a new line
+		}
+		System.out.println();
+		
+		getASCIIcode(array, length, bits); //Calling method to convert each character to its ASCII code
+	}
+
+//-----------------------------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------------------------------------------------	
+	
+	public static void getASCIIcode(char [] array, int length, int bits)
+	{
+		int [] intArr = new int [array.length];
+		int j = 0, charCount = 0, totalCount = 0;
+		
+		for(int i = 0; i < array.length; i++)
+		{
+				intArr[j] = (int) array[i]; //The (int) type cast changes gives the ASCII code 
+				j++;
+		}
+		
+		charCount = array.length;
+		int padding = charCount % (bits / 8); //Determines whether padding ('X') will be needed
+		int x;
+		
+		if(padding != 0) //If padding is required, then changes to the total character count is made here
+		{
+			padding = (bits / 8) - padding;
+			totalCount = charCount + padding;
+			x = padding;
+			while(x != 0)
+			{
+				System.out.print("X");
+				x--;
+			}
+		}
+		else totalCount = charCount;
+		convertToBinary(intArr, array, bits, charCount, padding, totalCount); //Calling function to get the Binary number
+	}
+	
+//-----------------------------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------------------------------------------------
+	
+	public static void convertToBinary(int [] intArr, char [] array, int bits, int charCount, int padding, int totalCount)
+	{
+		int bitsToAdd = 0;
+		String [] binaryArr = new String [totalCount];
+		String readStr = null, fixStr = "";
+		
+		//NOTE: Integer.toBinaryString() does not produce an 8 bits Binary number. Does not print the first zeros.
+		//      Example: 00101101 = 101101; need to manually add the zeroes.  
+		
+		for(int i = 0; i < totalCount; i++)
+		{
+			if(i < charCount) //Converts the file to Binary
+			{	
+				readStr = Integer.toBinaryString(intArr[i]); 
+				bitsToAdd = 8 - readStr.length(); //Determines whether it is complete 8 bits or not
+			}
+			
+			if(i == charCount - 1) //Converts the new line character to Binary
+			{
+				readStr = Integer.toBinaryString(10);
+				bitsToAdd = 8 - readStr.length();
+			}
+			
+			if(padding != 0 && i >= charCount)//Converts the pad ('X') to Binary when padding is required
+			{
+				readStr = Integer.toBinaryString(88);
+				bitsToAdd = 8 - readStr.length();
+				padding--;
+			}
+			
+			if(bitsToAdd == 0)
+				binaryArr[i] = readStr;
+			else //If it less than 8 bits, zeroes are added in this else statement
+			{
+				fixStr = "";
+				while(bitsToAdd != 0)
+				{
+					fixStr = fixStr + "0";
+					bitsToAdd--;
+				}
+				fixStr = fixStr + readStr;
+				binaryArr[i] = fixStr;
+			}
+		}
+		
+		splitIntoBlocks(binaryArr, bits, charCount, totalCount); //This method splits the "binaryArr" for proper addition based on
+		                                                        // size of the checksum
+	}
+	
+//-----------------------------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------------------------------------------------
+	
+	public static void splitIntoBlocks(String [] binaryArr, int bits, int charCount, int totalCount)
+	{
+		int blockLength = bits / 8;
+		int numOfBlocks = totalCount / blockLength;
+		int temp = blockLength;
+		int j = 0, i = 0;
+		String [] blockArr = new String[numOfBlocks];
+		String concatStr = "";
+		
+		while(i < totalCount)
+		{
+			if(temp != 1)//If checksum size is 16 or 32, splitting is required 
+			{
+				while(temp != 0)
+				{
+					concatStr = concatStr + binaryArr[i];
+					i++;
+					temp--;
+				}
+			
+				blockArr[j] = concatStr;
+				temp = blockLength;
+				concatStr = "";
+				j++;
+			}
+			
+			else if(temp == 1) //If checksum size is 8, no splitting is required
+			{
+				blockArr[i] = binaryArr[i];
+				i++;
+			}
+		}
+		
+			
+		addNumbers(blockArr, bits, totalCount); //Adding the Binary numbers here
+	}
+	
+//-----------------------------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------------------------------------------------
+	
+	public static void addNumbers(String [] blockArr, int bits, int totalCount)
+	{
+		int tempArrLength = blockArr[0].length();
+		int carry = 0, index;
+		String str1, str2, ans = "", temp;
+		String [] tempArr = new String[tempArrLength];
+	
+		for(int i = 0; i < blockArr.length; i++) //Iterating through "blockArr" containing the split up blocks of Binary numbers
+		{
+			temp = "0";
+			carry = 0;
+			index = tempArrLength - 1;
+			if(i == 0) //For index 0, assigning "str1" with the first block and "str2" with the second block 
+			{
+				str1 = blockArr[i];
+				i++;
+				str2 = blockArr[i];
+			}
+			else //For index other than 0, assigning "str1" with the answer from the previous addition and "str2" with the next block
+			{
+				str1 = ans;
+				ans = "";
+				str2 = blockArr[i];
+			}
+			
+			for(int j = tempArrLength - 1; j >= 0; j--) //Iterating through the characters of each str1 and str2
+			{
+				//The if else statements compare each character at each index to generate an answer
+				if(str1.charAt(j) == '0' && str2.charAt(j) == '0')
+				{
+					if(carry == 1)
+					{
+						temp = "1";
+						carry = 0;
+					}
+					else temp = "0";
+				}
+				else if((str1.charAt(j) == '1' && str2.charAt(j) == '0') || (str1.charAt(j) == '0' && str2.charAt(j) == '1')) 
+				{
+					if(carry == 1)
+					{
+						temp = "0";
+						carry = 1;
+					}
+					else temp = "1";
+				}
+				else if(str1.charAt(j) == '1' && str2.charAt(j) == '1')
+				{
+					if(carry == 1)
+					{
+						temp = "1";
+						carry = 1;
+					}
+					else
+					{
+						temp = "0";
+						carry = 1;
+					}
+				}
+				
+				tempArr[index] = temp; //Storing the answer of each bit in an array
+				index--;
+			}
+			
+			for(int m = 0; m < tempArr.length; m++) //Once two blocks are added, the full answer is stored in String "ans"
+				ans = ans + tempArr[m];
+		}
+		convertToHex(ans, bits, totalCount); //Interpreting the Binary numbers in correct Hexadecimal format for final answer
+	}
+	
+//-----------------------------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------------------------------------------------
+	
+	public static void convertToHex(String ans, int bits, int totalCount)
+	{
+		int hexArrLength = bits / 4;
+		int tempCount, count, block, j, x, zero, index;
+		int [] hexArr = new int [hexArrLength];
+		char readStr;
+		String tempStr = "", finalAns = "";
+		
+		tempCount = block = j = zero = index = 0;
+		x = hexArrLength - 1;
+		
+		for(int i = ans.length() - 1; i >= 0; i--)
+		{
+			readStr = ans.charAt(i);
+			
+			if(readStr == '1') //If there is "1" in the number, convert it
+			{
+				count = (int) Math.pow(2, j); //Taking the index "j" and using it as an exponent for "2"
+				tempCount = tempCount + count; //Storing the answer of all 4 bits
+			}
+			
+			block++; //Making sure 4 bits are interpreted as 1 hexadecimal character
+			j++;
+			
+			if(block == 4)
+			{
+				hexArr[x] = tempCount; //Transferring the answer of 4 bits into an array for later use
+				x--;
+				tempCount = 0;
+				block = 0;
+				j = 0;
+			}	
+		}
+		
+		for(int m = 0; m < hexArr.length; m++)
+			tempStr = tempStr + Integer.toHexString(hexArr[m]); //Converting each number to hexadecimal
+		
+		if(tempStr.charAt(0) == '0') //If there are zeroes in the beginning of the answer, they will be trimmed here
+		{
+			for(int n = 0; n < ans.length(); n++)
+			{
+				if(tempStr.charAt(n) == '0')
+				{
+					zero++;
+					continue;
+				}
+				else
+				{
+					for(int b = zero; b < tempStr.length(); b++)
+						finalAns = finalAns + tempStr.charAt(b);
+					break;
+				}
+			}
+		}
+		else finalAns = tempStr; //If no zeroes, then continue
+		
+		//Printing the final answer as desired
+		System.out.println();
+		System.out.printf("%2d bit checksum is ", bits);
+		System.out.printf("%8s for all ", finalAns);
+		System.out.printf("%4d chars\n", totalCount);
+	}
+}
+
+/* END OF PROGRAM */
